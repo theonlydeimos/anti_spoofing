@@ -4,7 +4,7 @@ torchmetrics
 numpy==1.26.4
 tqdm
 matplotlib
-pandas
+pandas==3.0.5
 wandb
 comet_ml
 hydra-core
