@@ -1,5 +1,5 @@
 _target_: src.logger.WandBWriter
-project_name: "pytorch_template"
+project_name: "voice_anti_spoofing"
 entity: null
 run_name: "testing"
 mode: "online"

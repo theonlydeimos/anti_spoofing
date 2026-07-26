@@ -112,3 +112,14 @@ outputs/
 .vscode/
 .idea/
 __MACOSX/
+
+# macOS metadata
+.DS_Store
+
+# Model checkpoints
+*.pth
+*.ckpt
+
+# Local grading output
+students_solutions/
+grades.csv
