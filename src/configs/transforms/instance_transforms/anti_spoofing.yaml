@@ -1,0 +1,27 @@
+train:
+  data_object:
+    _target_: torchvision.transforms.v2.Compose
+    transforms:
+      - _target_: src.transforms.anti_spoofing.WaveformToSpectrogram
+        n_fft: 512
+        win_length: 320
+        hop_length: 160
+        power: 2.0
+        normalized: false
+      - _target_: src.transforms.anti_spoofing.TrimPadTransform
+        size_to_crop_to: 750
+        random_crop: true
+
+inference:
+  data_object:
+    _target_: torchvision.transforms.v2.Compose
+    transforms:
+      - _target_: src.transforms.anti_spoofing.WaveformToSpectrogram
+        n_fft: 512
+        win_length: 320
+        hop_length: 160
+        power: 2.0
+        normalized: false
+      - _target_: src.transforms.anti_spoofing.TrimPadTransform
+        size_to_crop_to: 750
+        random_crop: false
