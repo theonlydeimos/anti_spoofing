@@ -45,7 +45,11 @@ class ConvMFMPair(nn.Module):
 
 
 class AntiSpoofingModel(nn.Module):
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        n_classes: int = 2,
+        dropout_probability: float = 0.75,
+    ) -> None:
         super().__init__()
 
         self.net = nn.Sequential(
@@ -144,7 +148,38 @@ class AntiSpoofingModel(nn.Module):
                 kernel_size=2,
                 stride=2,
             ),
+            # FC_29
+            nn.Flatten(start_dim=1),
+            nn.Linear(in_features=23552, out_features=160),
+            # MFM_30
+            MaxFeatureMap(),
+            # Dropout
+            nn.Dropout(p=dropout_probability),
+            # BatchNorm_31
+            nn.BatchNorm1d(num_features=80),
+            # FC_32
+            nn.Linear(in_features=80, out_features=n_classes),
         )
+        self.apply(self._initialize_weights)
 
-    def forward(self, input_tensor: torch.Tensor) -> torch.Tensor:
-        return self.net(input_tensor)
+    @staticmethod
+    def _initialize_weights(module: nn.Module) -> None:
+        if isinstance(module, (nn.Conv2d, nn.Linear)):
+            nn.init.kaiming_normal_(module.weight)
+            if module.bias is not None:
+                nn.init.zeros_(module.bias)
+
+    def forward(
+        self,
+        data_object: torch.Tensor,
+        **batch,
+    ) -> dict[str, torch.Tensor]:
+        if data_object.ndim == 3:
+            data_object = data_object.unsqueeze(dim=1)
+
+        if data_object.ndim != 4 or data_object.shape[1] != 1:
+            raise ValueError(
+                "Expected data_object with shape [B, F, T] or [B, 1, F, T]."
+            )
+
+        return {"logits": self.net(data_object)}
