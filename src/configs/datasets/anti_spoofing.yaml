@@ -1,0 +1,4 @@
+defaults:
+  - anti_spoofing_train
+  - anti_spoofing_dev
+  - _self_

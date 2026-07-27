@@ -1,0 +1,5 @@
+eval:
+  _target_: src.datasets.anti_spoofing.AntiSpoofingDataset
+  data_root: ${paths.data_root}
+  partition: eval
+  instance_transforms: ${transforms.instance_transforms.inference}

@@ -1,0 +1,5 @@
+train:
+  _target_: src.datasets.anti_spoofing.AntiSpoofingDataset
+  data_root: ${paths.data_root}
+  partition: train
+  instance_transforms: ${transforms.instance_transforms.train}
