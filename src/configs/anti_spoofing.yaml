@@ -1,5 +1,5 @@
 defaults:
-  - model: baseline
+  - model: anti_spoofing
   - writer: wandb
   - metrics: example
   - datasets: anti_spoofing

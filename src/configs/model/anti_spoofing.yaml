@@ -1,0 +1,3 @@
+_target_: src.model.AntiSpoofingModel
+n_classes: 2
+dropout_probability: 0.75
