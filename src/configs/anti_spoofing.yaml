@@ -20,7 +20,7 @@ lr_scheduler:
   step_size: ${trainer.epoch_len}
 
 loss_function:
-  _target_: src.loss.ExampleLoss
+  _target_: src.loss.AntiSpoofingLoss
 
 trainer:
   log_step: 50
