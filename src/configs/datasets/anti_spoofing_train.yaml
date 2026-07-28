@@ -3,3 +3,4 @@ train:
   data_root: ${paths.data_root}
   partition: train
   instance_transforms: ${transforms.instance_transforms.train}
+  limit: null

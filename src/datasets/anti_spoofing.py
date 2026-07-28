@@ -13,6 +13,7 @@ class AntiSpoofingDataset(BaseDataset):
         data_root: str | Path,
         partition: Literal["train", "dev", "eval"],
         instance_transforms: None | Mapping[str, Callable] = None,
+        limit: int | None = None,
     ) -> None:
         self.data_root = Path(data_root)
 
@@ -67,7 +68,10 @@ class AntiSpoofingDataset(BaseDataset):
                 )
 
         super().__init__(
-            index=index, shuffle_index=shuffle, instance_transforms=instance_transforms
+            index=index,
+            limit=limit,
+            shuffle_index=shuffle,
+            instance_transforms=instance_transforms,
         )
 
     def load_object(self, path: str | Path):
