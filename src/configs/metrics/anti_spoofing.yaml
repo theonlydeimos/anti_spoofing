@@ -1,0 +1,6 @@
+train:
+  - _target_: src.metrics.AntiSpoofingAccuracy
+    name: "TRAIN_Accuracy"
+inference:
+  - _target_: src.metrics.AntiSpoofingAccuracy
+    name: "Accuracy"
