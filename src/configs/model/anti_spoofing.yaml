@@ -1,3 +1,7 @@
 _target_: src.model.AntiSpoofingModel
 n_classes: 2
 dropout_probability: 0.75
+n_input_frequency_bins: 257
+n_projected_frequency_bins: 60
+n_input_frames: 750
+sample_rate: 16000

@@ -16,8 +16,8 @@ optimizer:
 
 lr_scheduler:
   _target_: torch.optim.lr_scheduler.StepLR
-  gamma: 0.9
-  step_size: ${trainer.epoch_len}
+  gamma: 0.5
+  step_size: 5000
 
 loss_function:
   _target_: src.loss.AntiSpoofingLoss
