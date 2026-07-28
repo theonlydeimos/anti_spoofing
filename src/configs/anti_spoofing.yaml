@@ -30,7 +30,7 @@ trainer:
   resume_from: null
   device: auto
   override: false
-  monitor: "off"
+  monitor: "min dev_EER"
   save_period: 5
   early_stop: ${trainer.n_epochs}
   save_dir: "saved"
