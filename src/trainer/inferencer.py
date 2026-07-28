@@ -3,6 +3,7 @@ from tqdm.auto import tqdm
 
 from src.metrics.tracker import MetricTracker
 from src.trainer.base_trainer import BaseTrainer
+from src.utils.prediction_utils import write_score_csv
 
 
 class Inferencer(BaseTrainer):
@@ -21,6 +22,7 @@ class Inferencer(BaseTrainer):
         device,
         dataloaders,
         save_path,
+        prediction_filename,
         metrics=None,
         batch_transforms=None,
         skip_model_load=False,
@@ -36,6 +38,8 @@ class Inferencer(BaseTrainer):
                 sets of data.
             save_path (str): path to save model predictions and other
                 information.
+            prediction_filename (str): name of the CSV file with utterance
+                scores.
             metrics (dict): dict with the definition of metrics for
                 inference (metrics[inference]). Each metric is an instance
                 of src.metrics.BaseMetric.
@@ -65,12 +69,14 @@ class Inferencer(BaseTrainer):
         # path definition
 
         self.save_path = save_path
+        self.prediction_filename = prediction_filename
 
         # define metrics
         self.metrics = metrics
         if self.metrics is not None:
             self.evaluation_metrics = MetricTracker(
                 *[m.name for m in self.metrics["inference"]],
+                *[m.name for m in self.metrics.get("epoch_inference", [])],
                 writer=None,
             )
         else:
@@ -94,7 +100,7 @@ class Inferencer(BaseTrainer):
             part_logs[part] = logs
         return part_logs
 
-    def process_batch(self, batch_idx, batch, metrics, part):
+    def process_batch(self, batch, metrics):
         """
         Run batch through the model, compute metrics, and
         save predictions to disk.
@@ -103,14 +109,11 @@ class Inferencer(BaseTrainer):
         config and current partition.
 
         Args:
-            batch_idx (int): the index of the current batch.
             batch (dict): dict-based batch containing the data from
                 the dataloader.
             metrics (MetricTracker): MetricTracker object that computes
                 and aggregates the metrics. The metrics depend on the type
                 of the partition (train or inference).
-            part (str): name of the partition. Used to define proper saving
-                directory.
         Returns:
             batch (dict): dict-based batch containing the data from
                 the dataloader (possibly transformed via batch transform)
@@ -125,30 +128,6 @@ class Inferencer(BaseTrainer):
         if metrics is not None:
             for met in self.metrics["inference"]:
                 metrics.update(met.name, met(**batch))
-
-        # Some saving logic. This is an example
-        # Use if you need to save predictions on disk
-
-        batch_size = batch["logits"].shape[0]
-        current_id = batch_idx * batch_size
-
-        for i in range(batch_size):
-            # clone because of
-            # https://github.com/pytorch/pytorch/issues/1995
-            logits = batch["logits"][i].clone()
-            label = batch["labels"][i].clone()
-            pred_label = logits.argmax(dim=-1)
-
-            output_id = current_id + i
-
-            output = {
-                "pred_label": pred_label,
-                "label": label,
-            }
-
-            if self.save_path is not None:
-                # you can use safetensors or other lib here
-                torch.save(output, self.save_path / part / f"output_{output_id}.pth")
 
         return batch
 
@@ -167,22 +146,51 @@ class Inferencer(BaseTrainer):
         self.model.eval()
 
         self.evaluation_metrics.reset()
+        epoch_metric_funcs = self.metrics.get("epoch_inference", [])
+        epoch_logits = []
+        epoch_labels = []
+        epoch_audio_file_ids = []
 
-        # create Save dir
         if self.save_path is not None:
-            (self.save_path / part).mkdir(exist_ok=True, parents=True)
+            self.save_path.mkdir(exist_ok=True, parents=True)
 
         with torch.no_grad():
-            for batch_idx, batch in tqdm(
-                enumerate(dataloader),
+            for batch in tqdm(
+                dataloader,
                 desc=part,
                 total=len(dataloader),
             ):
                 batch = self.process_batch(
-                    batch_idx=batch_idx,
                     batch=batch,
-                    part=part,
                     metrics=self.evaluation_metrics,
                 )
+
+                epoch_logits.append(batch["logits"].detach().cpu())
+                epoch_labels.append(batch["labels"].detach().cpu())
+                if "audio_file_id" in batch:
+                    epoch_audio_file_ids.extend(batch["audio_file_id"])
+
+        logits = torch.cat(epoch_logits)
+        labels = torch.cat(epoch_labels)
+
+        for metric in epoch_metric_funcs:
+            self.evaluation_metrics.update(
+                metric.name,
+                metric(logits=logits, labels=labels),
+            )
+
+        if self.save_path is not None:
+            if not epoch_audio_file_ids:
+                raise ValueError(f"Partition '{part}' does not provide utterance IDs.")
+
+            prediction_filename = self.prediction_filename
+            if len(self.evaluation_dataloaders) > 1:
+                prediction_filename = f"{part}_{prediction_filename}"
+
+            write_score_csv(
+                audio_file_ids=epoch_audio_file_ids,
+                logits=logits,
+                output_path=self.save_path / prediction_filename,
+            )
 
         return self.evaluation_metrics.result()

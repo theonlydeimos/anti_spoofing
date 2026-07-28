@@ -74,5 +74,10 @@ class AntiSpoofingDataset(BaseDataset):
             instance_transforms=instance_transforms,
         )
 
+    def __getitem__(self, ind):
+        instance_data = super().__getitem__(ind)
+        instance_data["audio_file_id"] = self._index[ind]["audio_file_id"]
+        return instance_data
+
     def load_object(self, path: str | Path):
         return torchaudio.load(path)[0][0]

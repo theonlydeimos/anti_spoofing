@@ -2,6 +2,7 @@ import torch
 
 from src.metrics.base_metric import BaseMetric
 from src.metrics.calculate_eer import compute_eer
+from src.utils.prediction_utils import compute_bonafide_scores
 
 
 class AntiSpoofingAccuracy(BaseMetric):
@@ -49,7 +50,7 @@ class AntiSpoofingEER(BaseMetric):
         if not torch.any(labels == 0).item() or not torch.any(labels == 1).item():
             raise ValueError("Expected labels to contain both classes 0 and 1.")
 
-        scores: torch.Tensor = logits[:, 1] - logits[:, 0]
+        scores = compute_bonafide_scores(logits)
         if not torch.all(scores.isfinite()).item():
             raise ValueError("Scores contain non-finite values.")
 

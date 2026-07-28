@@ -1,0 +1,18 @@
+defaults:
+  - model: anti_spoofing
+  - metrics: anti_spoofing
+  - datasets: anti_spoofing_eval
+  - dataloader: anti_spoofing
+  - transforms: anti_spoofing
+  - _self_
+
+paths:
+  data_root: ???
+
+inferencer:
+  device_tensors: ["data_object", "labels"]
+  device: auto
+  save_dir: "saved/asvspoof2019_la_lcnn"
+  prediction_filename: "predictions.csv"
+  seed: 1
+  from_pretrained: "${inferencer.save_dir}/model_best.pth"

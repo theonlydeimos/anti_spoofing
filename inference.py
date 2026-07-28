@@ -12,7 +12,11 @@ from src.utils.io_utils import ROOT_PATH
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-@hydra.main(version_base=None, config_path="src/configs", config_name="inference")
+@hydra.main(
+    version_base=None,
+    config_path="src/configs",
+    config_name="anti_spoofing_inference",
+)
 def main(config):
     """
     Main script for inference. Instantiates the model, metrics, and
@@ -41,7 +45,7 @@ def main(config):
     metrics = instantiate(config.metrics)
 
     # save_path for model predictions
-    save_path = ROOT_PATH / "data" / "saved" / config.inferencer.save_path
+    save_path = ROOT_PATH / config.inferencer.save_dir
     save_path.mkdir(exist_ok=True, parents=True)
 
     inferencer = Inferencer(
@@ -51,6 +55,7 @@ def main(config):
         dataloaders=dataloaders,
         batch_transforms=batch_transforms,
         save_path=save_path,
+        prediction_filename=config.inferencer.prediction_filename,
         metrics=metrics,
         skip_model_load=False,
     )

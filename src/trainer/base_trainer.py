@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from pathlib import Path
 
 import torch
 from numpy import inf
@@ -8,6 +9,7 @@ from tqdm.auto import tqdm
 from src.datasets.data_utils import inf_loop
 from src.metrics.tracker import MetricTracker
 from src.utils.io_utils import ROOT_PATH
+from src.utils.prediction_utils import write_score_csv
 
 
 class BaseTrainer:
@@ -128,6 +130,7 @@ class BaseTrainer:
             *[m.name for m in self.metrics.get("epoch_inference", [])],
             writer=self.writer,
         )
+        self.evaluation_outputs = {}
 
         # define checkpoint dir and init everything if required
 
@@ -179,7 +182,7 @@ class BaseTrainer:
                         "LR": epoch_learning_rate,
                         "train_loss": logs["loss"],
                         "dev_loss": logs["dev_loss"],
-                        "eval_eer": logs["dev_EER"],
+                        "eval_eer": logs["eval_EER"],
                     }
                 )
 
@@ -192,6 +195,9 @@ class BaseTrainer:
             best, stop_process, not_improved_count = self._monitor_performance(
                 logs, not_improved_count
             )
+
+            if best:
+                self._save_best_predictions()
 
             if epoch % self.save_period == 0 or best:
                 self._save_checkpoint(epoch, save_best=best, only_best=True)
@@ -266,6 +272,9 @@ class BaseTrainer:
         epoch_metric_funcs = self.metrics.get("epoch_inference", [])
         epoch_logits = []
         epoch_labels = []
+        epoch_audio_file_ids = []
+        prediction_part = self.cfg_trainer.get("prediction_part")
+        collect_epoch_outputs = bool(epoch_metric_funcs) or part == prediction_part
         with torch.no_grad():
             for batch_idx, batch in tqdm(
                 enumerate(dataloader),
@@ -277,14 +286,23 @@ class BaseTrainer:
                     metrics=self.evaluation_metrics,
                 )
 
-                if epoch_metric_funcs:
+                if collect_epoch_outputs:
                     epoch_logits.append(batch["logits"].detach().cpu())
                     epoch_labels.append(batch["labels"].detach().cpu())
+                    if "audio_file_id" in batch:
+                        epoch_audio_file_ids.extend(batch["audio_file_id"])
 
-            if epoch_metric_funcs:
+            if collect_epoch_outputs:
                 logits = torch.cat(epoch_logits)
                 labels = torch.cat(epoch_labels)
 
+                if part == prediction_part:
+                    self.evaluation_outputs[part] = {
+                        "audio_file_ids": epoch_audio_file_ids,
+                        "logits": logits,
+                    }
+
+            if epoch_metric_funcs:
                 for metric in epoch_metric_funcs:
                     self.evaluation_metrics.update(
                         metric.name,
@@ -296,6 +314,30 @@ class BaseTrainer:
             )  # log only the last batch during inference
 
         return self.evaluation_metrics.result()
+
+    def _save_best_predictions(self):
+        prediction_part = self.cfg_trainer.get("prediction_part")
+        prediction_filename = self.cfg_trainer.get("prediction_filename")
+        if prediction_part is None or prediction_filename is None:
+            return
+
+        if prediction_part not in self.evaluation_outputs:
+            raise ValueError(
+                f"No predictions were collected for partition '{prediction_part}'."
+            )
+
+        outputs = self.evaluation_outputs[prediction_part]
+        if not outputs["audio_file_ids"]:
+            raise ValueError(
+                f"Partition '{prediction_part}' does not provide utterance IDs."
+            )
+
+        output_path = write_score_csv(
+            audio_file_ids=outputs["audio_file_ids"],
+            logits=outputs["logits"],
+            output_path=self.checkpoint_dir / prediction_filename,
+        )
+        self.logger.info(f"Saving best prediction scores: {output_path} ...")
 
     def _monitor_performance(self, logs, not_improved_count):
         """
@@ -556,6 +598,9 @@ class BaseTrainer:
         Args:
             pretrained_path (str): path to the model state dict.
         """
+        pretrained_path = Path(pretrained_path)
+        if not pretrained_path.is_absolute():
+            pretrained_path = ROOT_PATH / pretrained_path
         pretrained_path = str(pretrained_path)
         if hasattr(self, "logger"):  # to support both trainer and inferencer
             self.logger.info(f"Loading model weights from: {pretrained_path} ...")
