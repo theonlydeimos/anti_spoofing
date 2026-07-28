@@ -1,9 +1,5 @@
-train:
-  - _target_: src.metrics.AntiSpoofingAccuracy
-    name: "TRAIN_Accuracy"
-inference:
-  - _target_: src.metrics.AntiSpoofingAccuracy
-    name: "Accuracy"
+train: []
+inference: []
 epoch_inference:
   - _target_: src.metrics.AntiSpoofingEER
     name: "EER"

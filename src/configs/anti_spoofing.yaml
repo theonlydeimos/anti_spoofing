@@ -10,6 +10,10 @@ defaults:
 paths:
   data_root: ???
 
+writer:
+  run_name: "asvspoof2019_la_lcnn"
+  epoch_metrics: ["LR", "train_loss", "dev_loss", "eval_eer"]
+
 optimizer:
   _target_: torch.optim.Adam
   lr: 3e-4

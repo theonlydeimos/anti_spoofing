@@ -1,5 +1,3 @@
-from datetime import datetime
-
 import numpy as np
 import pandas as pd
 
@@ -44,7 +42,7 @@ class WandBWriter:
 
             self.run_id = run_id
 
-            wandb.init(
+            self.run = wandb.init(
                 project=project_name,
                 entity=entity,
                 config=project_config,
@@ -54,6 +52,13 @@ class WandBWriter:
                 mode=mode,
                 save_code=kwargs.get("save_code", False),
             )
+
+            epoch_metrics = kwargs.get("epoch_metrics", [])
+            if epoch_metrics:
+                self.run.define_metric("epoch", hidden=True)
+                for metric_name in epoch_metrics:
+                    self.run.define_metric(metric_name, step_metric="epoch")
+
             self.wandb = wandb
 
         except ImportError:
@@ -63,30 +68,17 @@ class WandBWriter:
         # the mode is usually equal to the current partition name
         # used to separate Partition1 and Partition2 metrics
         self.mode = ""
-        self.timer = datetime.now()
 
-    def set_step(self, step, mode="train"):
+    def set_step(self, step, mode=""):
         """
         Define current step and mode for the tracker.
-
-        Calculates the difference between method calls to monitor
-        training/evaluation speed.
 
         Args:
             step (int): current step.
             mode (str): current mode (partition name).
         """
         self.mode = mode
-        previous_step = self.step
         self.step = step
-        if step == 0:
-            self.timer = datetime.now()
-        else:
-            duration = datetime.now() - self.timer
-            self.add_scalar(
-                "steps_per_sec", (self.step - previous_step) / duration.total_seconds()
-            )
-            self.timer = datetime.now()
 
     def _object_name(self, object_name):
         """
@@ -99,7 +91,9 @@ class WandBWriter:
         Returns:
             object_name (str): updated object name.
         """
-        return f"{object_name}_{self.mode}"
+        if self.mode:
+            return f"{object_name}_{self.mode}"
+        return object_name
 
     def add_checkpoint(self, checkpoint_path, save_dir):
         """

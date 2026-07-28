@@ -119,7 +119,6 @@ class BaseTrainer:
         self.metrics = metrics
         self.train_metrics = MetricTracker(
             *self.config.writer.loss_names,
-            "grad_norm",
             *[m.name for m in self.metrics["train"]],
             writer=self.writer,
         )
@@ -165,11 +164,24 @@ class BaseTrainer:
         not_improved_count = 0
         for epoch in range(self.start_epoch, self.epochs + 1):
             self._last_epoch = epoch
+            epoch_learning_rate = self.optimizer.param_groups[0]["lr"]
             result = self._train_epoch(epoch)
 
             # save logged information into logs dict
             logs = {"epoch": epoch}
             logs.update(result)
+
+            if self.writer is not None:
+                self.writer.set_step(epoch, mode="")
+                self.writer.add_scalars(
+                    {
+                        "epoch": epoch,
+                        "LR": epoch_learning_rate,
+                        "train_loss": logs["loss"],
+                        "dev_loss": logs["dev_loss"],
+                        "eval_eer": logs["dev_EER"],
+                    }
+                )
 
             # print logged information to the screen
             for key, value in logs.items():
@@ -201,8 +213,6 @@ class BaseTrainer:
         self.is_train = True
         self.model.train()
         self.train_metrics.reset()
-        self.writer.set_step((epoch - 1) * self.epoch_len)
-        self.writer.add_scalar("epoch", epoch)
         for batch_idx, batch in enumerate(
             tqdm(self.train_dataloader, desc="train", total=self.epoch_len)
         ):
@@ -219,29 +229,18 @@ class BaseTrainer:
                 else:
                     raise e
 
-            self.train_metrics.update("grad_norm", self._get_grad_norm())
-
-            # log current results
+            # print current results
             if batch_idx % self.log_step == 0:
-                self.writer.set_step((epoch - 1) * self.epoch_len + batch_idx)
                 self.logger.debug(
                     "Train Epoch: {} {} Loss: {:.6f}".format(
                         epoch, self._progress(batch_idx), batch["loss"].item()
                     )
                 )
-                self.writer.add_scalar(
-                    "learning rate", self.lr_scheduler.get_last_lr()[0]
-                )
-                self._log_scalars(self.train_metrics)
                 self._log_batch(batch_idx, batch)
-                # we don't want to reset train metrics at the start of every epoch
-                # because we are interested in recent train metrics
-                last_train_metrics = self.train_metrics.result()
-                self.train_metrics.reset()
             if batch_idx + 1 >= self.epoch_len:
                 break
 
-        logs = last_train_metrics
+        logs = self.train_metrics.result()
 
         # Run val/test
         for part, dataloader in self.evaluation_dataloaders.items():
@@ -292,8 +291,6 @@ class BaseTrainer:
                         metric(logits=logits, labels=labels),
                     )
 
-            self.writer.set_step(epoch * self.epoch_len, part)
-            self._log_scalars(self.evaluation_metrics)
             self._log_batch(
                 batch_idx, batch, part
             )  # log only the last batch during inference
