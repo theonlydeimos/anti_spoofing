@@ -4,3 +4,6 @@ train:
 inference:
   - _target_: src.metrics.AntiSpoofingAccuracy
     name: "Accuracy"
+epoch_inference:
+  - _target_: src.metrics.AntiSpoofingEER
+    name: "EER"

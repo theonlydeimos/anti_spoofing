@@ -126,6 +126,7 @@ class BaseTrainer:
         self.evaluation_metrics = MetricTracker(
             *self.config.writer.loss_names,
             *[m.name for m in self.metrics["inference"]],
+            *[m.name for m in self.metrics.get("epoch_inference", [])],
             writer=self.writer,
         )
 
@@ -263,6 +264,9 @@ class BaseTrainer:
         self.is_train = False
         self.model.eval()
         self.evaluation_metrics.reset()
+        epoch_metric_funcs = self.metrics.get("epoch_inference", [])
+        epoch_logits = []
+        epoch_labels = []
         with torch.no_grad():
             for batch_idx, batch in tqdm(
                 enumerate(dataloader),
@@ -273,6 +277,21 @@ class BaseTrainer:
                     batch,
                     metrics=self.evaluation_metrics,
                 )
+
+                if epoch_metric_funcs:
+                    epoch_logits.append(batch["logits"].detach().cpu())
+                    epoch_labels.append(batch["labels"].detach().cpu())
+
+            if epoch_metric_funcs:
+                logits = torch.cat(epoch_logits)
+                labels = torch.cat(epoch_labels)
+
+                for metric in epoch_metric_funcs:
+                    self.evaluation_metrics.update(
+                        metric.name,
+                        metric(logits=logits, labels=labels),
+                    )
+
             self.writer.set_step(epoch * self.epoch_len, part)
             self._log_scalars(self.evaluation_metrics)
             self._log_batch(
