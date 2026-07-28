@@ -17,15 +17,15 @@ optimizer:
 lr_scheduler:
   _target_: torch.optim.lr_scheduler.StepLR
   gamma: 0.5
-  step_size: 5000
+  step_size: 31730
 
 loss_function:
   _target_: src.loss.AntiSpoofingLoss
 
 trainer:
   log_step: 50
-  n_epochs: 100
-  epoch_len: 500
+  n_epochs: 20
+  epoch_len: null
   device_tensors: ["data_object", "labels"]
   resume_from: null
   device: auto
