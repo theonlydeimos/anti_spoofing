@@ -3,13 +3,16 @@ train:
     _target_: torchvision.transforms.v2.Compose
     transforms:
       - _target_: src.transforms.anti_spoofing.WaveformToSpectrogram
-        n_fft: 512
-        win_length: 320
-        hop_length: 160
+        n_fft: 1724
+        win_length: 1724
+        hop_length: 130
         power: 2.0
         normalized: false
+        window_fn:
+          _target_: torch.blackman_window
+          _partial_: true
       - _target_: src.transforms.anti_spoofing.TrimPadTransform
-        size_to_crop_to: 750
+        size_to_crop_to: 600
         random_crop: true
 
 inference:
@@ -17,11 +20,14 @@ inference:
     _target_: torchvision.transforms.v2.Compose
     transforms:
       - _target_: src.transforms.anti_spoofing.WaveformToSpectrogram
-        n_fft: 512
-        win_length: 320
-        hop_length: 160
+        n_fft: 1724
+        win_length: 1724
+        hop_length: 130
         power: 2.0
         normalized: false
+        window_fn:
+          _target_: torch.blackman_window
+          _partial_: true
       - _target_: src.transforms.anti_spoofing.TrimPadTransform
-        size_to_crop_to: 750
+        size_to_crop_to: 600
         random_crop: false

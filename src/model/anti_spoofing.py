@@ -1,41 +1,5 @@
 import torch
-import torchaudio
 from torch import nn
-
-
-class FrequencyCompressionFC(nn.Module):
-    def __init__(
-        self,
-        n_input_frequency_bins: int,
-        n_output_frequency_bins: int,
-        sample_rate: int,
-    ) -> None:
-        super().__init__()
-        self.n_input_frequency_bins = n_input_frequency_bins
-        self.n_output_frequency_bins = n_output_frequency_bins
-        self.sample_rate = sample_rate
-        self.net = nn.Linear(
-            in_features=n_input_frequency_bins,
-            out_features=n_output_frequency_bins,
-            bias=False,
-        )
-        self.initialize_as_linear_filter_bank()
-
-    @torch.no_grad()
-    def initialize_as_linear_filter_bank(self) -> None:
-        filter_bank = torchaudio.functional.linear_fbanks(
-            n_freqs=self.n_input_frequency_bins,
-            f_min=0.0,
-            f_max=self.sample_rate / 2,
-            n_filter=self.n_output_frequency_bins,
-            sample_rate=self.sample_rate,
-        )
-        self.net.weight.copy_(filter_bank.transpose(0, 1))
-
-    def forward(self, spectrogram: torch.Tensor) -> torch.Tensor:
-        spectrogram = spectrogram.transpose(1, 2)
-        projected_spectrogram = self.net(spectrogram)
-        return projected_spectrogram.transpose(1, 2)
 
 
 class MaxFeatureMap(nn.Module):
@@ -85,22 +49,15 @@ class AntiSpoofingModel(nn.Module):
         self,
         n_classes: int = 2,
         dropout_probability: float = 0.75,
-        n_input_frequency_bins: int = 257,
-        n_projected_frequency_bins: int = 60,
-        n_input_frames: int = 750,
-        sample_rate: int = 16000,
+        n_input_frequency_bins: int = 863,
+        n_input_frames: int = 600,
     ) -> None:
         super().__init__()
 
         self.n_input_frequency_bins = n_input_frequency_bins
         self.n_input_frames = n_input_frames
-        self.frequency_compression = FrequencyCompressionFC(
-            n_input_frequency_bins=n_input_frequency_bins,
-            n_output_frequency_bins=n_projected_frequency_bins,
-            sample_rate=sample_rate,
-        )
 
-        n_pooled_frequency_bins = n_projected_frequency_bins
+        n_pooled_frequency_bins = n_input_frequency_bins
         n_pooled_frames = n_input_frames
         for _ in range(4):
             n_pooled_frequency_bins //= 2
@@ -108,8 +65,7 @@ class AntiSpoofingModel(nn.Module):
 
         if n_pooled_frequency_bins == 0 or n_pooled_frames == 0:
             raise ValueError(
-                "The projected spectrogram must be large enough for four pooling "
-                "layers."
+                "The input spectrogram must be large enough for four pooling " "layers."
             )
 
         n_flattened_features = 32 * n_pooled_frequency_bins * n_pooled_frames
@@ -223,7 +179,6 @@ class AntiSpoofingModel(nn.Module):
             nn.Linear(in_features=80, out_features=n_classes),
         )
         self.apply(self._initialize_weights)
-        self.frequency_compression.initialize_as_linear_filter_bank()
 
     @staticmethod
     def _initialize_weights(module: nn.Module) -> None:
@@ -257,7 +212,6 @@ class AntiSpoofingModel(nn.Module):
                 f"but got {data_object.shape[2]}."
             )
 
-        data_object = self.frequency_compression(data_object)
         data_object = data_object.unsqueeze(dim=1)
 
         return {"logits": self.net(data_object)}

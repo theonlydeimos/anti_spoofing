@@ -1,4 +1,5 @@
 import random
+from collections.abc import Callable
 
 import torch
 import torchaudio
@@ -13,6 +14,7 @@ class WaveformToSpectrogram(nn.Module):
         hop_length: int,
         power: float = 2.0,
         normalized: bool = False,
+        window_fn: Callable[..., torch.Tensor] = torch.hann_window,
     ) -> None:
         super().__init__()
 
@@ -22,6 +24,7 @@ class WaveformToSpectrogram(nn.Module):
             "hop_length": hop_length,
             "power": power,
             "normalized": normalized,
+            "window_fn": window_fn,
         }
 
         self.stft = torchaudio.transforms.Spectrogram(**self.stft_config)
